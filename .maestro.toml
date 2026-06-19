@@ -1,0 +1,10 @@
+[project]
+name = "maestro"
+root = "."
+
+[agents]
+claude = "claude"
+opencode = "opencode"
+
+[workspace]
+worktree_base = ".maestro-worktrees"
