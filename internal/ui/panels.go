@@ -5,51 +5,57 @@ import (
 	"strings"
 
 	"github.com/biglitecode/maestro/internal/agent"
-	"github.com/biglitecode/maestro/internal/broker"
 	"github.com/biglitecode/maestro/internal/workspace"
 
 	"github.com/charmbracelet/lipgloss"
 )
 
-func panelStyle(focused bool, color lipgloss.Color) lipgloss.Style {
-	border := lipgloss.NormalBorder()
-	if focused {
-		return lipgloss.NewStyle().
-			Border(border).
+var (
+	borderThin = lipgloss.RoundedBorder()
+
+	baseStyle = lipgloss.NewStyle().
+			Border(borderThin).
+			BorderForeground(ColorBorder).
+			Padding(0)
+
+	focusStyle = lipgloss.NewStyle().
+			Border(borderThin).
 			BorderForeground(ColorBorderFocus).
-			BorderBackground(color).
-			Padding(0, 1)
-	}
-	return lipgloss.NewStyle().
-		Border(border).
-		BorderForeground(ColorBorder).
-		Padding(0, 1)
-}
+			Padding(0)
+)
 
 func renderWorkspacePanel(m Model, width, height int) string {
-	style := panelStyle(m.focusedPanel == PanelWorkspaces, ColorStatus).Width(width).Height(height)
+	focused := m.focusedPanel == PanelWorkspaces
+	style := baseStyle
+	if focused {
+		style = focusStyle
+	}
+	style = style.Width(width).Height(height)
+
 	var sb strings.Builder
-	sb.WriteString("Workspaces\n")
-	sb.WriteString(strings.Repeat("─", width-2))
+	sb.WriteString(lipgloss.NewStyle().Bold(true).Foreground(ColorStatus).Render("Workspaces"))
+	sb.WriteByte('\n')
+	sb.WriteString(lipgloss.NewStyle().Foreground(ColorMuted).Render(strings.Repeat("─", width-2)))
 	sb.WriteByte('\n')
 
 	wss := m.wsManager.List()
 	if len(wss) == 0 {
-		sb.WriteString("(no workspaces)\n")
-		sb.WriteString("press 'n' to create one")
+		sb.WriteString("(empty) press n")
 		return style.Render(sb.String())
 	}
 
 	for i, ws := range wss {
 		cursor := "  "
 		if i == m.selectedWorkspace {
-			cursor = "> "
+			cursor = lipgloss.NewStyle().Foreground(ColorBorderFocus).Bold(true).Render("> ")
 		}
-		attached := "○"
+		attached := lipgloss.NewStyle().Foreground(ColorMuted).Render("○")
 		if len(ws.ListAgents()) > 0 {
-			attached = "●"
+			attached = lipgloss.NewStyle().Foreground(ColorSuccess).Render("●")
 		}
-		line := fmt.Sprintf("%s%s %s (%s", cursor, attached, ws.Name, ws.Mode)
+		name := lipgloss.NewStyle().Bold(focused && i == m.selectedWorkspace).Render(ws.Name)
+		mode := lipgloss.NewStyle().Foreground(ColorMuted).Render(fmt.Sprintf("%s", ws.Mode))
+		line := fmt.Sprintf("%s%s %s (%s", cursor, attached, name, mode)
 		if ws.Mode == workspace.ModeIsolated {
 			line += fmt.Sprintf(", %s", ws.Branch)
 		}
@@ -60,20 +66,23 @@ func renderWorkspacePanel(m Model, width, height int) string {
 	return style.Render(sb.String())
 }
 
-func renderAgentPanel(m Model, a *agent.Agent, title string, color lipgloss.Color, width, height int) string {
-	panel := PanelClaude
-	if a != nil && a.Kind == agent.KindOpenCode {
-		panel = PanelOpenCode
+func renderAgentPanel(m Model, a *agent.Agent, title string, color lipgloss.Color, panel Panel, width, height int) string {
+	focused := m.focusedPanel == panel
+	style := baseStyle
+	if focused {
+		style = focusStyle.BorderForeground(color)
 	}
-	style := panelStyle(m.focusedPanel == panel, color).Width(width).Height(height)
+	style = style.Width(width).Height(height)
 
 	var sb strings.Builder
 	status := "idle"
 	if a != nil {
 		status = a.Status.String()
 	}
-	sb.WriteString(fmt.Sprintf("%s [%s]\n", title, status))
-	sb.WriteString(strings.Repeat("─", width-2))
+	titleStr := lipgloss.NewStyle().Bold(true).Foreground(color).Render(fmt.Sprintf("%s [%s]", title, status))
+	sb.WriteString(titleStr)
+	sb.WriteByte('\n')
+	sb.WriteString(lipgloss.NewStyle().Foreground(color).Render(strings.Repeat("─", width-2)))
 	sb.WriteByte('\n')
 
 	var content string
@@ -83,7 +92,7 @@ func renderAgentPanel(m Model, a *agent.Agent, title string, color lipgloss.Colo
 		content = m.opencodeVP.View()
 	}
 	if content == "" {
-		content = "(no output yet)"
+		content = lipgloss.NewStyle().Foreground(ColorMuted).Render("(no output)")
 	}
 	sb.WriteString(content)
 
@@ -91,15 +100,22 @@ func renderAgentPanel(m Model, a *agent.Agent, title string, color lipgloss.Colo
 }
 
 func renderBrokerPanel(m Model, width, height int) string {
-	style := panelStyle(m.focusedPanel == PanelBroker, ColorBroker).Width(width).Height(height)
+	focused := m.focusedPanel == PanelBroker
+	style := baseStyle
+	if focused {
+		style = focusStyle.BorderForeground(ColorBroker)
+	}
+	style = style.Width(width).Height(height)
+
 	var sb strings.Builder
-	sb.WriteString("Broker\n")
-	sb.WriteString(strings.Repeat("─", width-2))
+	sb.WriteString(lipgloss.NewStyle().Bold(true).Foreground(ColorBroker).Render("Broker"))
+	sb.WriteByte('\n')
+	sb.WriteString(lipgloss.NewStyle().Foreground(ColorBroker).Render(strings.Repeat("─", width-2)))
 	sb.WriteByte('\n')
 
 	content := m.brokerVP.View()
 	if content == "" {
-		content = "(no messages)"
+		content = lipgloss.NewStyle().Foreground(ColorMuted).Render("(no messages)")
 	}
 	sb.WriteString(content)
 
@@ -107,37 +123,42 @@ func renderBrokerPanel(m Model, width, height int) string {
 }
 
 func renderInputBar(m Model, width int) string {
-	style := panelStyle(m.focusedPanel == PanelInput, ColorForeground).Width(width)
+	focused := m.focusedPanel == PanelInput
+	style := baseStyle
+	if focused {
+		style = focusStyle.BorderForeground(ColorBorderFocus)
+	}
+	style = style.Width(width)
+
 	var sb strings.Builder
 	sb.WriteString(m.inputBar.View())
 	return style.Render(sb.String())
 }
 
-func renderStatusBar(m Model, width int) string {
+func renderStatusBar(m Model, width int, l layout) string {
 	branch := currentGitBranch(m.cfg.Project.Root)
-	text := fmt.Sprintf(" %s | branch: %s | agents: %d | focus: %s ",
-		m.cfg.Project.Name,
-		branch,
-		m.runningAgentsCount(),
-		m.focusedPanel,
-	)
+	focus := m.focusedPanel.String()
+
+	left := fmt.Sprintf(" %s | %s | agents:%d ", m.cfg.Project.Name, branch, m.runningAgentsCount())
+	right := fmt.Sprintf(" %dx%d | focus:%s ", l.termW, l.termH, focus)
+
+	fillW := width - lipgloss.Width(left) - lipgloss.Width(right)
+	if fillW < 0 {
+		fillW = 0
+	}
+
+	bar := left + strings.Repeat(" ", fillW) + right
+
 	if m.err != nil {
 		return lipgloss.NewStyle().
 			Width(width).
 			Background(ColorError).
 			Foreground(ColorBackground).
-			Render(text + "| " + m.statusText)
+			Render(" " + m.statusText)
 	}
 	return lipgloss.NewStyle().
 		Width(width).
-		Background(ColorStatus).
-		Foreground(ColorBackground).
-		Render(text)
-}
-
-func brokerMessages(m Model) []broker.Message {
-	if m.broker == nil {
-		return nil
-	}
-	return m.broker.Log()
+		Background(ColorBackground).
+		Foreground(ColorForeground).
+		Render(bar)
 }

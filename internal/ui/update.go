@@ -68,29 +68,16 @@ func (m *Model) recalcLayout() {
 		return
 	}
 
-	leftW := int(float64(m.termWidth) * 0.20)
-	if leftW < 20 {
-		leftW = 20
-	}
-	rightW := m.termWidth - leftW - 1
-	agentW := rightW / 2
+	l := computeLayout(m.termWidth, m.termHeight)
 
-	statusH := 1
-	brokerH := 6
-	inputH := 3
-	contentH := m.termHeight - statusH - brokerH - inputH - 1
-	if contentH < 5 {
-		contentH = 5
-	}
-
-	m.claudeVP.Width = agentW - 2
-	m.claudeVP.Height = contentH - 2
-	m.opencodeVP.Width = agentW - 2
-	m.opencodeVP.Height = contentH - 2
-	m.brokerVP.Width = m.termWidth - 2
-	m.brokerVP.Height = brokerH - 2
-	m.inputBar.SetWidth(m.termWidth - 2)
-	m.inputBar.SetHeight(inputH - 1)
+	m.claudeVP.Width = l.agent1W - 2
+	m.claudeVP.Height = l.contentH - 2
+	m.opencodeVP.Width = l.agent2W - 2
+	m.opencodeVP.Height = l.contentH - 2
+	m.brokerVP.Width = l.termW - 2
+	m.brokerVP.Height = l.brokerH - 2
+	m.inputBar.SetWidth(l.termW - 2)
+	m.inputBar.SetHeight(l.inputH - 1)
 }
 
 func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
